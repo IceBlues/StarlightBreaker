@@ -1,8 +1,14 @@
-﻿using Reloaded.Hooks.Definitions;
+using Dalamud.Hooking;
+using Iced.Intel;
+using Reloaded.Hooks.Definitions;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Xml.Linq;
+using static FFXIVClientStructs.FFXIV.Client.LayoutEngine.FileLayerGroupLayerFilter;
+using static Iced.Intel.AssemblerRegisters;
 
 namespace StarlightBreaker
 {
@@ -34,21 +40,27 @@ namespace StarlightBreaker
             this.detour = detour;
 
             var detourPtr = Marshal.GetFunctionPointerForDelegate(this.detour);
-            var code = new[]
-            {
-            "use64",
-            $"mov rax, 0x{detourPtr:X8}",
-            "call rax",
-        };
+            //var code = new[]
+            //{
+            //"use64",
+            //$"mov rax, 0x{detourPtr:X8}",
+            //"call rax",
+            //};
 
+            var assembler = new Assembler(64);
+            assembler.mov(rax, (ulong)detourPtr);
+            assembler.call(rax);
+            var stream = new MemoryStream();
+            var writer = new StreamCodeWriter(stream);
+            assembler.Assemble(writer, 0);
+            var bytes = stream.ToArray();
             var opt = new AsmHookOptions
             {
                 PreferRelativeJump = true,
                 Behaviour = Reloaded.Hooks.Definitions.Enums.AsmHookBehaviour.DoNotExecuteOriginal,
                 MaxOpcodeSize = 5,
             };
-
-            this.asmHook = new Reloaded.Hooks.AsmHook(code, (nuint)address, opt);
+            this.asmHook = new Reloaded.Hooks.AsmHook(bytes, (nuint)address, opt);
         }
 
         /// <summary>
